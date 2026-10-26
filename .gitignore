@@ -1,0 +1,23 @@
+# Dependencies and build output
+node_modules/
+dist/
+build/
+coverage/
+.turbo/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+
+# Local library data (database and captured images)
+data/
+library/
+*.sqlite
+*.sqlite3
+*.db
+
+# Editor and operating-system files
+.DS_Store
+Thumbs.db
+.vscode/
