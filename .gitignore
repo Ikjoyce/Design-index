@@ -3,6 +3,9 @@ node_modules/
 dist/
 build/
 coverage/
+test-results/
+playwright-report/
+*.tsbuildinfo
 .turbo/
 
 # Local configuration and secrets
@@ -16,6 +19,8 @@ library/
 *.sqlite
 *.sqlite3
 *.db
+*.sqlite-wal
+*.sqlite-shm
 
 # Editor and operating-system files
 .DS_Store
