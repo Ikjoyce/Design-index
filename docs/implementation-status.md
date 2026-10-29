@@ -15,7 +15,7 @@ This is the current checklist against the original implementation plan. The orig
 | Labels | Six facets, confidence/review markers, manual add/accept/reject decisions kept separately from generated output |
 | Editable vocabulary | Versioned terms; add/retire; canonical rename/merge aliases; conflict rejection for inconsistent manual decisions; provenance and cache invalidation by vocabulary revision |
 | Prompt authoring | Automatic coding-agent prompt, on-demand design-tool and short vibe variants, saved-only copying, per-variant immutable versions, paginated history and restore-as-new-version |
-| Gallery | Masonry layout, notes/title editing, full-text search across current saved content, one facet/label filter at a time, original download/detail view |
+| Gallery | Visible split URL/image intake header (stacked on smaller screens), masonry layout, notes/title editing, full-text search across current saved content, one facet/label filter at a time, original download/detail view |
 | Appearance/recovery | Light/dark/system appearance, local preference persistence, native control theming, browser session recovery after server restarts, both localhost development aliases |
 | URL capture | Isolated sandboxed Chrome; desktop/full-page/mobile views; bounded CSS facts and CSS-first palettes; authenticated DNS-pinning proxy; private-network denial; exact local-origin approvals; persistent jobs, cancellation/retry |
 | Evaluation tools | Explicit hand-labeling of up to 30 references; 2–4-model comparisons; blind frozen inputs/image integrity checks; shared consent and request history; schema validity, precision/recall/F1/exact facet scores, latency/reported tokens; CSV/JSON reports; result isolation |
@@ -80,3 +80,9 @@ Scope note: Go-only and vision-only model choices follow the owner's decisions. 
 - Earlier verification sections above describe their respective slices, not the current runtime's pause behavior. A pre-change `before-go-managed-usage-*.sqlite` backup was taken before upgrading.
 - An isolated comparison of the owner's backup confirms migration 7 → 8 preserves all rows/columns in the 18 non-settings tables and changes only the two retired settings; integrity and foreign-key checks pass. The restored live app exposes no allowance/enable controls and automatically began its queued work with the already-saved consent and server key.
 - Current dependency audit (2026-10-29) reports one moderate `@hono/node-server` advisory, GHSA-rmxm-3fg6-px4f. Dependency upgrades were not included in this behavior change; earlier zero-vulnerability results above are historical.
+
+## Visible intake header — 2026-10-29
+
+- URL capture and image drag-and-drop are always visible in a split header, rather than a Browser capture toggle/drawer. Smaller screens stack the two methods. Title/note drafts stay independent; URL submission also works with Enter.
+- Appearance/local-origin permissions and capture job history/cancel/retry remain secondary disclosures. Capture networking, AI consent, persistence, and analysis behavior are unchanged.
+- Verification: typecheck/build, **215 unit/integration tests and 20 Chrome workflow tests pass**, including desktop/mobile layout, independent drafts, existing drag/drop/paste, capture permissions, and keyboard URL submission. Light desktop and dark mobile screenshots were visually checked using isolated synthetic references.

@@ -3,11 +3,12 @@ import { expect, test } from '@playwright/test';
 test('captures URLs locally, switches views, and enforces local-origin permissions', async ({ page }, testInfo) => {
   const errors: string[] = []; page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('/');
-  await page.getByRole('button', { name: 'Browser capture', exact: true }).click();
   const panel = page.getByRole('region', { name: 'Capture a page', exact: true });
+  await expect(panel.getByLabel('Page URL', { exact: true })).toBeVisible();
   await panel.getByLabel('Page URL', { exact: true }).fill('http://169.254.169.254');
   await panel.getByRole('button', { name: 'Capture URL', exact: true }).click();
   await expect(panel.getByRole('alert')).toContainText('blocked');
+  await panel.getByText('Capture options', { exact: true }).click();
   await panel.getByText('Local dev-server permissions', { exact: true }).click();
   await panel.getByLabel('Approved local origins').fill('http://localhost:4317');
   await panel.getByRole('button', { name: 'Save capture permissions', exact: true }).click();

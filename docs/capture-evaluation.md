@@ -2,7 +2,9 @@
 
 ## Browser capture
 
-Open **Browser capture** in the gallery. A URL request queues a local background job and does not itself call Go. Once saved, the new reference follows the library's existing AI settings: if background AI/image sharing are enabled, normal analysis and prompt writing are queued automatically.
+The gallery header shows a **Page URL** field and an **image drag-and-drop** area side by side, stacked on smaller screens. URL capture is always visible, not inside a drawer. Submit with **Capture URL** or Enter. Optional URL title/note fields do not consume image-upload drafts. Site appearance and local-origin permissions live under **Capture options**; job history/cancel/retry live under **Recent URL captures**.
+
+A URL request queues a local background job and does not itself call Go. Once saved, the reference follows the library's existing key/model/sharing prerequisites, automatically queueing normal analysis and prompt writing when ready.
 
 Google Chrome must be installed. The capturer uses Playwright's `chrome` channel, headless with the Chromium sandbox explicitly enabled. It never uses the owner's existing browser profile or signed-in cookies. Each capture launches a new process; desktop and mobile use separate fresh contexts, including separate cookie jars. Local-origin approvals are persisted in SQLite, not browser settings.
 

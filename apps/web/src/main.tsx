@@ -117,7 +117,6 @@ function App() {
   const [showAi, setShowAi] = useState(false);
   const [vocabulary, setVocabulary] = useState<VocabularyState>(() => defaultVocabulary());
   const [showVocabulary, setShowVocabulary] = useState(false);
-  const [showCapture, setShowCapture] = useState(false);
   const [showEvaluation, setShowEvaluation] = useState(false);
   const [refresh, setRefresh] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -297,24 +296,28 @@ function App() {
 
     <main className="main-content">
       <header className="topbar"><span className="breadcrumb">Library <span>/</span> <strong>All references</strong></span><div className="topbar-actions"><span className="edition">PERSONAL EDITION <span>01</span></span><ThemeToggle /></div></header>
-      <section className="page-heading"><div><p className="eyebrow">YOUR EYE, COLLECTED.</p><h1>A little inspiration.<br /><em>A lot of possibility.</em></h1><p className="intro">Keep the details that caught your eye.<br className="mobile-break" /> Make them the start of something new.</p></div><button className="primary-button header-add" onClick={() => fileInput.current?.click()} disabled={!connected || uploading}><Icon name="plus" size={18} /> Add reference</button></section>
+      <section className="page-heading"><div><p className="eyebrow">YOUR EYE, COLLECTED.</p><h1>A little inspiration.<br /><em>A lot of possibility.</em></h1><p className="intro">Keep the details that caught your eye.<br className="mobile-break" /> Make them the start of something new.</p></div></section>
 
-      <section className={`capture-panel ${dragging ? 'dragging' : ''}`} aria-labelledby="capture-heading"
-        onDragOver={(event) => { event.preventDefault(); setDragging(true); }}
-        onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false); }}
-        onDrop={(event) => { event.preventDefault(); setDragging(false); void capture(event.dataTransfer.files); }}>
-        <div className="capture-icon"><Icon name={uploading ? 'upload' : 'image'} size={25} /></div>
-        <div className="capture-copy"><h2 id="capture-heading">{uploading ? 'Finding the colors in your reference…' : dragging ? 'A good find. Drop it here.' : 'Found something worth saving?'}</h2><p>Drop an image, paste a screenshot, or <button className="inline-link" onClick={() => fileInput.current?.click()} disabled={!connected || uploading}>browse files</button>.<span className="file-hint"> PNG, JPG, WebP · up to 20 MB</span></p></div>
-        <span className="capture-local">LOCAL FIRST <span>↙</span></span>
-        <input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" aria-label="Choose reference image" tabIndex={-1} disabled={!connected || uploading} onChange={(event) => { if (event.target.files) void capture(event.target.files); }} />
-        <div className="capture-fields"><label><span>Title <span className="optional">/ optional</span></span><input value={title} maxLength={160} placeholder="Give your find a name" onChange={(event) => setTitle(event.target.value)} disabled={uploading} /></label><label><span>Why I saved this <span className="optional">/ optional</span></span><input value={note} maxLength={2000} placeholder="The type, the palette, that one lovely detail…" onChange={(event) => setNote(event.target.value)} disabled={uploading} /></label></div>
+      <section className="capture-intake" aria-label="Add inspiration">
+        <UrlCapturePanel connected={connected} onCaptured={(id) => void captured(id)} />
+        <div className="intake-divider" aria-hidden="true"><span>or</span></div>
+        <section className={`capture-panel ${dragging ? 'dragging' : ''}`} aria-labelledby="capture-heading"
+          onDragOver={(event) => { event.preventDefault(); if (event.dataTransfer.types.includes('Files')) setDragging(true); }}
+          onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false); }}
+          onDrop={(event) => { event.preventDefault(); setDragging(false); if (event.dataTransfer.files.length) void capture(event.dataTransfer.files); }}>
+          <div className="capture-method-heading"><div className="capture-icon"><Icon name={uploading ? 'upload' : 'image'} size={23} /></div><div className="capture-copy"><span className="method-eyebrow">FROM AN IMAGE</span><h2 id="capture-heading">Save an image</h2></div></div>
+          <p className="capture-description">Bring a screenshot or a saved design reference.</p>
+          <div className="image-drop-zone"><strong>{uploading ? 'Finding the colors in your reference…' : dragging ? 'A good find. Drop it here.' : 'Drop an image here'}</strong><p>Paste a screenshot, or <button className="inline-link" onClick={() => fileInput.current?.click()} disabled={!connected || uploading}>browse files</button>.</p><span className="file-hint">PNG, JPG, WebP · up to 20 MB</span></div>
+          <input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" aria-label="Choose reference image" tabIndex={-1} disabled={!connected || uploading} onChange={(event) => { if (event.target.files) void capture(event.target.files); }} />
+          <div className="capture-fields"><label><span>Title <span className="optional">/ optional</span></span><input value={title} maxLength={160} placeholder="Give your find a name" onChange={(event) => setTitle(event.target.value)} disabled={!connected || uploading} /></label><label><span>Why I saved this <span className="optional">/ optional</span></span><input value={note} maxLength={2000} placeholder="The detail worth keeping…" onChange={(event) => setNote(event.target.value)} disabled={!connected || uploading} /></label></div>
+          <p className="capture-footnote">Your original image stays untouched.</p>
+        </section>
       </section>
 
       {inbox && <FolderInboxPanel status={inbox} ai={ai} onChange={setInbox} onOpen={(id) => void openInboxItem(id)} />}
-      <div className="ai-toolbar"><span className="muted">{ai ? `OpenCode Go · ${ai.analysis.replaceAll('_', ' ')} · ${ai.queued} queued` : 'Loading AI status…'}</span><div className="library-settings-actions"><button className="text-link" aria-expanded={showCapture} disabled={!connected} onClick={() => setShowCapture((value) => !value)}>{showCapture ? 'Close browser capture' : 'Browser capture'}</button><button className="text-link" aria-expanded={showEvaluation} disabled={!connected} onClick={() => setShowEvaluation((value) => !value)}>{showEvaluation ? 'Close evaluation lab' : 'Evaluation tools'}</button><button className="text-link" aria-expanded={showVocabulary} disabled={!connected} onClick={() => void toggleVocabulary()}>{showVocabulary ? 'Close vocabulary' : 'Vocabulary'}</button><button className="text-link" aria-expanded={showAi} onClick={() => setShowAi((value) => !value)}>{showAi ? 'Close AI settings' : 'AI settings'}</button></div></div>
+      <div className="ai-toolbar"><span className="muted">{ai ? `OpenCode Go · ${ai.analysis.replaceAll('_', ' ')} · ${ai.queued} queued` : 'Loading AI status…'}</span><div className="library-settings-actions"><button className="text-link" aria-expanded={showEvaluation} disabled={!connected} onClick={() => setShowEvaluation((value) => !value)}>{showEvaluation ? 'Close evaluation lab' : 'Evaluation tools'}</button><button className="text-link" aria-expanded={showVocabulary} disabled={!connected} onClick={() => void toggleVocabulary()}>{showVocabulary ? 'Close vocabulary' : 'Vocabulary'}</button><button className="text-link" aria-expanded={showAi} onClick={() => setShowAi((value) => !value)}>{showAi ? 'Close AI settings' : 'AI settings'}</button></div></div>
       {showAi && ai && <AiSettingsPanel status={ai} onChange={setAi} />}
       {showVocabulary && <VocabularyPanel vocabulary={vocabulary} onChange={updateVocabulary} />}
-      {showCapture && <UrlCapturePanel onCaptured={(id) => void captured(id)} />}
       {showEvaluation && <EvaluationPanel ai={ai} vocabulary={vocabulary} />}
 
       {error && <div className="error-message error-banner" role="alert"><span>{error}</span><button className="inline-link" onClick={() => void reconnect()}>Retry</button></div>}
