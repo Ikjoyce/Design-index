@@ -8,5 +8,5 @@ await build({
   target: 'node22',
   bundle: true,
   sourcemap: true,
-  external: ['hono', '@hono/node-server', 'sharp', 'better-sqlite3', 'drizzle-orm', 'zod'],
+  external: ['hono', '@hono/node-server', 'sharp', 'better-sqlite3', 'drizzle-orm', 'zod', 'ai', '@ai-sdk/anthropic', '@ai-sdk/openai', '@ai-sdk/openai-compatible', '@ai-sdk/google', 'playwright', 'ipaddr.js'],
 });

@@ -3,7 +3,7 @@ import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import sharp from 'sharp';
 import { extractPalette } from '@design-index/palette';
-import { MAX_IMAGE_PIXELS, SUPPORTED_IMAGE_FORMATS } from '@design-index/shared';
+import { MAX_IMAGE_PIXELS, MAX_UPLOAD_BYTES, SUPPORTED_IMAGE_FORMATS } from '@design-index/shared';
 import type { CaptureResult } from '@design-index/shared';
 import type { Library } from '@design-index/database';
 
@@ -15,6 +15,7 @@ export async function saveImage(
   bytes: Buffer,
   fields: { title: string; note: string },
 ): Promise<CaptureResult> {
+  if (bytes.length > MAX_UPLOAD_BYTES) throw new InvalidImageError('Choose an image under 20 MiB.');
   const contentHash = createHash('sha256').update(bytes).digest('hex');
   const existing = library.findByHash(contentHash);
   if (existing) return { item: existing, deduplicated: true };

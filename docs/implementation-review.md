@@ -1,5 +1,7 @@
 # Implementation review — 2026-10-26
 
+> Historical first-slice review. For current shipped features and remaining work, see [implementation-status.md](implementation-status.md).
+
 The plan is a sound product direction, but not a single implementation milestone. Begin with a working, offline vertical slice; add external services only after capture and persistence are dependable.
 
 ## Corrections and decisions

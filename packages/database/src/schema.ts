@@ -11,12 +11,13 @@ export const items = sqliteTable('items', {
   capturedAt: text('captured_at').notNull(),
   width: integer('width').notNull(),
   height: integer('height').notNull(),
+  sourceUrl: text('source_url'),
 });
 
 export const assets = sqliteTable('assets', {
   id: text('id').primaryKey(),
   itemId: text('item_id').notNull().references(() => items.id, { onDelete: 'cascade' }),
-  kind: text('kind', { enum: ['original', 'preview'] }).notNull(),
+  kind: text('kind', { enum: ['original', 'preview', 'full_page', 'viewport', 'mobile', 'element_crop'] }).notNull(),
   path: text('path').notNull(),
   mime: text('mime').notNull(),
   width: integer('width').notNull(),
@@ -39,8 +40,9 @@ export const paletteColors = sqliteTable('palette_colors', {
 export const jobs = sqliteTable('jobs', {
   id: text('id').primaryKey(),
   itemId: text('item_id').notNull().references(() => items.id, { onDelete: 'cascade' }),
-  kind: text('kind', { enum: ['analyze'] }).notNull(),
+  kind: text('kind', { enum: ['analyze', 'write_prompt'] }).notNull(),
   status: text('status', { enum: ['queued', 'running', 'completed', 'failed'] }).notNull(),
   attempts: integer('attempts').notNull().default(0),
   createdAt: text('created_at').notNull(),
+  runId: text('run_id').notNull(),
 });

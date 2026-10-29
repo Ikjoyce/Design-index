@@ -1,0 +1,15 @@
+{
+  "name": "@design-index/analysis",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "dependencies": {
+    "@design-index/shared": "*",
+    "@ai-sdk/anthropic": "^4.0.89",
+    "@ai-sdk/openai": "^4.0.103",
+    "@ai-sdk/openai-compatible": "^3.0.79",
+    "@ai-sdk/google": "^4.0.106",
+    "ai": "^7.0.154"
+  }
+}

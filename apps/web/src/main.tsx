@@ -1,8 +1,15 @@
 import { StrictMode, useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { MAX_UPLOAD_BYTES, paletteToCss } from '@design-index/shared/browser';
-import type { LibraryItem } from '@design-index/shared/browser';
+import { canonicalLabel, defaultVocabulary, FACETS, MAX_UPLOAD_BYTES, paletteToCss } from '@design-index/shared/browser';
+import type { AiStatus, AssetKind, Facet, InboxStatus, LibraryItem, VocabularyState } from '@design-index/shared/browser';
 import { api } from './api';
+import { AiSettingsPanel } from './AiSettingsPanel';
+import { IntelligencePanel } from './IntelligencePanel';
+import { ThemeToggle } from './ThemeToggle';
+import { VocabularyPanel } from './VocabularyPanel';
+import { UrlCapturePanel } from './UrlCapturePanel';
+import { EvaluationPanel } from './EvaluationPanel';
+import { FolderInboxPanel } from './FolderInboxPanel';
 import './styles.css';
 
 function Icon({ name, size = 20 }: { name: 'grid' | 'plus' | 'search' | 'arrow' | 'close' | 'copy' | 'image' | 'upload' | 'check'; size?: number }) {
@@ -24,8 +31,8 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Something went wrong. Please try again.';
 }
 
-function ItemDetail({ item, onClose, onUpdate, announce }: {
-  item: LibraryItem; onClose: () => void; onUpdate: (item: LibraryItem) => void; announce: (message: string) => void;
+function ItemDetail({ item, vocabulary, onClose, onUpdate, announce }: {
+  item: LibraryItem; vocabulary: VocabularyState; onClose: () => void; onUpdate: (item: LibraryItem) => void; announce: (message: string) => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [title, setTitle] = useState(item.title);
@@ -33,6 +40,8 @@ function ItemDetail({ item, onClose, onUpdate, announce }: {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [confirmation, setConfirmation] = useState('');
+  const [view, setView] = useState<AssetKind>(item.type === 'url' ? 'viewport' : 'preview');
+  const displayed = item.assets.find((asset) => asset.kind === view);
   const dirty = title !== item.title || note !== item.note;
   useEffect(() => {
     const element = dialog.current;
@@ -63,7 +72,14 @@ function ItemDetail({ item, onClose, onUpdate, announce }: {
   return <dialog ref={dialog} className="detail-dialog" onCancel={(event) => { event.preventDefault(); onClose(); }} onClick={(event) => { if (event.target === event.currentTarget) onClose(); }} aria-labelledby="detail-heading">
     <div className="detail-top"><span className="eyebrow">REFERENCE / {new Date(item.capturedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span><button className="icon-button" aria-label="Close reference" onClick={onClose}><Icon name="close" /></button></div>
     <div className="detail-grid">
-      <div className="detail-art"><img src={item.previewUrl} alt={item.title} /><a className="text-link" href={item.originalUrl} download>Download untouched original <Icon name="arrow" size={16} /></a><span className="muted text-xs">{item.width.toLocaleString()} × {item.height.toLocaleString()} px</span></div>
+      <div className="detail-art">
+        {item.type === 'url' && <div className="capture-view-tabs" role="group" aria-label="Captured views">{(['viewport', 'full_page', 'mobile'] as const).map((kind) => <button className="secondary-button" key={kind} aria-pressed={view === kind} onClick={() => setView(kind)}>{kind === 'full_page' ? 'Full page' : kind === 'viewport' ? 'Desktop' : 'Mobile'}</button>)}</div>}
+        <img src={displayed?.url ?? item.previewUrl} alt={item.title} />
+        <a className="text-link" href={item.originalUrl} download>{item.type === 'url' ? 'Download full-page PNG' : 'Download untouched original'} <Icon name="arrow" size={16} /></a>
+        <span className="muted text-xs">{(item.type === 'url' ? displayed?.width ?? item.width : item.width).toLocaleString()} × {(item.type === 'url' ? displayed?.height ?? item.height : item.height).toLocaleString()} px</span>
+        {item.sourceUrl && <a className="text-link source-link" href={item.sourceUrl} target="_blank" rel="noreferrer">Open source page <Icon name="arrow" size={16} /></a>}
+        {item.facts && <details className="page-facts"><summary>Captured page facts</summary><p>Fonts: {item.facts.fonts.join(', ') || 'not detected'}</p><p>{item.facts.styles.length} style samples · {item.facts.animations.length} CSS animation configurations · {item.facts.transitions.length} transitions</p>{item.facts.warnings.map((warning, index) => <p key={index}>{warning}</p>)}<details><summary>Measured style and motion samples</summary><pre>{JSON.stringify({ styles: item.facts.styles, animations: item.facts.animations, transitions: item.facts.transitions, libraries: item.facts.libraries }, null, 2)}</pre></details></details>}
+      </div>
       <div className="detail-content">
         <h2 id="detail-heading">A closer look.</h2>
         <form onSubmit={save} className="detail-form">
@@ -72,14 +88,14 @@ function ItemDetail({ item, onClose, onUpdate, announce }: {
           <button className="secondary-button justify-self-start" type="submit" disabled={!dirty || saving}>{saving ? 'Saving…' : 'Save notes'}</button>
         </form>
         <section className="palette-section" aria-labelledby="palette-heading">
-          <div className="section-heading"><h3 id="palette-heading">Extracted palette</h3><span className="eyebrow">OKLab / pixels</span></div>
+          <div className="section-heading"><h3 id="palette-heading">Extracted palette</h3><span className="eyebrow">{item.facts ? 'CSS / pixels' : 'OKLab / pixels'}</span></div>
           <div className="detail-palette">{item.palette.map((color, index) => <button key={color.hex} className="color-tile" onClick={() => void copy(color.hex, `${color.hex} copied.`)} title={`Copy ${color.hex}`}>
             <span className="color-block" style={{ backgroundColor: color.hex }} /><span className="color-hex">{color.hex}</span><span className="muted text-xs">{Math.round(color.weight * 100)}% · color {index + 1}</span>
           </button>)}</div>
-          <p className="muted text-xs leading-relaxed">From a downsampled image, not an AI guess. Roles like “accent” are not assigned yet.</p>
-          <div className="flex flex-wrap gap-3 mt-4"><button className="secondary-button" onClick={() => void copy(paletteToCss(item.palette), 'Palette CSS copied.')}><Icon name="copy" size={15} /> Copy CSS</button><a className="text-link" href={`/api/items/${item.id}/palette.css`} download>Download CSS</a></div>
+          <p className="muted text-xs leading-relaxed">{item.facts ? 'Colors come from opaque computed CSS first, with sampled pixels as a fallback.' : 'Colors come from sampled pixels.'} {item.intelligence.analysis ? 'Role assignments are model suggestions, restricted to these exact colors.' : 'Roles like “accent” stay unassigned until analysis.'}</p>
+          <div className="flex flex-wrap gap-3 mt-4"><button className="secondary-button" onClick={() => void copy(paletteToCss(item.palette, item.intelligence.analysis?.palette_roles), 'Palette CSS copied.')}><Icon name="copy" size={15} /> Copy CSS</button><a className="text-link" href={`/api/items/${item.id}/palette.css`} download>Download CSS</a></div>
         </section>
-        <section className="analysis-note"><span className="status-dot" /><div><h3>Saved locally. AI comes next.</h3><p>Labels and a design-language prompt will appear here once analysis is connected. Your reference and palette are already usable.</p></div></section>
+        <IntelligencePanel item={item} vocabulary={vocabulary} onUpdate={onUpdate} confirm={(message) => { setConfirmation(message); announce(message); }} />
         {error && <p className="error-message" role="alert">{error}</p>}
         <p className="copy-confirmation" role="status">{confirmation}</p>
       </div>
@@ -92,6 +108,17 @@ function App() {
   const [items, setItems] = useState<LibraryItem[]>([]);
   const [total, setTotal] = useState(0);
   const [query, setQuery] = useState('');
+  const [filterFacet, setFilterFacet] = useState<Facet>('style');
+  const [filterLabel, setFilterLabel] = useState('');
+  const [ai, setAi] = useState<AiStatus | null>(null);
+  const [inbox, setInbox] = useState<InboxStatus | null>(null);
+  const inboxRevision = useRef<string | null>(null);
+  const aiRevision = useRef<string | null>(null);
+  const [showAi, setShowAi] = useState(false);
+  const [vocabulary, setVocabulary] = useState<VocabularyState>(() => defaultVocabulary());
+  const [showVocabulary, setShowVocabulary] = useState(false);
+  const [showCapture, setShowCapture] = useState(false);
+  const [showEvaluation, setShowEvaluation] = useState(false);
   const [refresh, setRefresh] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -106,6 +133,9 @@ function App() {
   const uploadLock = useRef(false);
   const requestVersion = useRef(0);
   const searchInput = useRef<HTMLInputElement>(null);
+  const visibleItems = useRef(items);
+  visibleItems.current = items;
+  const workWasActive = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -117,19 +147,67 @@ function App() {
 
   useEffect(() => {
     if (!connected) return;
+    let cancelled = false;
+    api.vocabulary().then((value) => { if (!cancelled) setVocabulary(value); }).catch((error) => { if (!cancelled) setError(errorMessage(error)); });
+    return () => { cancelled = true; };
+  }, [connected]);
+
+  useEffect(() => {
+    if (!connected) return;
     const controller = new AbortController();
     requestVersion.current++;
     setLoading(true);
     setLoadingMore(false);
     const timeout = window.setTimeout(() => {
-      api.list(query, 0, controller.signal).then((page) => {
+      api.list(query, 0, controller.signal, filterLabel ? { facet: filterFacet, label: filterLabel } : undefined).then((page) => {
         if (!controller.signal.aborted) { setItems(page.items); setTotal(page.total); setLoading(false); }
       }).catch((error) => {
         if (!controller.signal.aborted) { setError(errorMessage(error)); setLoading(false); }
       });
     }, query ? 180 : 0);
     return () => { controller.abort(); window.clearTimeout(timeout); };
-  }, [connected, query, refresh]);
+  }, [connected, query, refresh, filterFacet, filterLabel]);
+
+  useEffect(() => {
+    if (!connected) return;
+    let cancelled = false;
+    let polling = false;
+    async function poll() {
+      if (polling) return;
+      polling = true;
+      const version = requestVersion.current;
+      try {
+        const [status, folder] = await Promise.all([api.ai(), api.inbox()]);
+        if (cancelled) return;
+        setAi(status);
+        const progress = JSON.stringify([status.analysis, status.queued, status.running, status.failed, status.usage]);
+        const aiChanged = aiRevision.current !== progress;
+        setInbox(folder);
+        const revision = `${folder.directory ?? ''}:${folder.revision}`;
+        const inboxChanged = folder.enabled && inboxRevision.current !== revision;
+        if (!inboxChanged) inboxRevision.current = revision;
+        const workActive = status.analysis === 'running' && status.queued + status.running > 0;
+        if (workActive || workWasActive.current || inboxChanged || aiChanged) {
+          const pages = await Promise.all(Array.from({ length: Math.max(1, Math.ceil(visibleItems.current.length / 50)) }, (_, index) => api.list(query, index * 50, undefined, filterLabel ? { facet: filterFacet, label: filterLabel } : undefined)));
+          if (!cancelled && version === requestVersion.current) {
+            setItems([...new Map(pages.flatMap((page) => page.items).map((item) => [item.id, item])).values()]);
+            setTotal(pages[0]!.total);
+            inboxRevision.current = revision;
+            aiRevision.current = progress;
+          }
+        }
+        if (!cancelled) workWasActive.current = workActive;
+        if (selected) {
+          const item = await api.item(selected.id);
+          if (!cancelled) setSelected((current) => current?.id === item.id ? item : current);
+        }
+      } catch (error) { if (!cancelled) setError(errorMessage(error)); }
+      finally { polling = false; }
+    }
+    void poll();
+    const interval = window.setInterval(() => void poll(), 2000);
+    return () => { cancelled = true; window.clearInterval(interval); };
+  }, [connected, query, filterFacet, filterLabel, selected?.id]);
 
   useEffect(() => {
     if (!notice) return;
@@ -168,7 +246,7 @@ function App() {
     const version = requestVersion.current;
     setLoadingMore(true);
     try {
-      const page = await api.list(query, items.length);
+      const page = await api.list(query, items.length, undefined, filterLabel ? { facet: filterFacet, label: filterLabel } : undefined);
       if (version === requestVersion.current) {
         setItems((existing) => [...existing, ...page.items]); setTotal(page.total);
       }
@@ -188,6 +266,26 @@ function App() {
     catch (error) { setError(errorMessage(error)); }
   }
 
+  function updateVocabulary(value: VocabularyState) {
+    setVocabulary(value);
+    if (filterLabel) setFilterLabel(canonicalLabel(value, filterFacet, filterLabel));
+    setRefresh((value) => value + 1);
+  }
+  async function toggleVocabulary() {
+    if (showVocabulary) { setShowVocabulary(false); return; }
+    try { updateVocabulary(await api.vocabulary()); setShowVocabulary(true); }
+    catch (error) { setError(errorMessage(error)); }
+  }
+  async function captured(id: string) {
+    setRefresh((value) => value + 1);
+    try { const item = await api.item(id); setSelected((current) => current ?? item); setNotice('URL capture saved locally.'); }
+    catch (error) { setError(errorMessage(error)); }
+  }
+  async function openInboxItem(id: string) {
+    try { setSelected(await api.item(id)); }
+    catch (error) { setError(errorMessage(error)); }
+  }
+
   return <div className="app-shell">
     <aside className="sidebar">
       <a className="brand" href="/" aria-label="Design Index home"><span className="brand-symbol">di<span>·</span></span><span>Design<br />Index</span></a>
@@ -198,7 +296,7 @@ function App() {
     </aside>
 
     <main className="main-content">
-      <header className="topbar"><span className="breadcrumb">Library <span>/</span> <strong>All references</strong></span><span className="edition">PERSONAL EDITION <span>01</span></span></header>
+      <header className="topbar"><span className="breadcrumb">Library <span>/</span> <strong>All references</strong></span><div className="topbar-actions"><span className="edition">PERSONAL EDITION <span>01</span></span><ThemeToggle /></div></header>
       <section className="page-heading"><div><p className="eyebrow">YOUR EYE, COLLECTED.</p><h1>A little inspiration.<br /><em>A lot of possibility.</em></h1><p className="intro">Keep the details that caught your eye.<br className="mobile-break" /> Make them the start of something new.</p></div><button className="primary-button header-add" onClick={() => fileInput.current?.click()} disabled={!connected || uploading}><Icon name="plus" size={18} /> Add reference</button></section>
 
       <section className={`capture-panel ${dragging ? 'dragging' : ''}`} aria-labelledby="capture-heading"
@@ -212,20 +310,28 @@ function App() {
         <div className="capture-fields"><label><span>Title <span className="optional">/ optional</span></span><input value={title} maxLength={160} placeholder="Give your find a name" onChange={(event) => setTitle(event.target.value)} disabled={uploading} /></label><label><span>Why I saved this <span className="optional">/ optional</span></span><input value={note} maxLength={2000} placeholder="The type, the palette, that one lovely detail…" onChange={(event) => setNote(event.target.value)} disabled={uploading} /></label></div>
       </section>
 
+      {inbox && <FolderInboxPanel status={inbox} ai={ai} onChange={setInbox} onOpen={(id) => void openInboxItem(id)} />}
+      <div className="ai-toolbar"><span className="muted">{ai ? `OpenCode Go · ${ai.analysis.replaceAll('_', ' ')} · ${ai.queued} queued` : 'Loading AI status…'}</span><div className="library-settings-actions"><button className="text-link" aria-expanded={showCapture} disabled={!connected} onClick={() => setShowCapture((value) => !value)}>{showCapture ? 'Close browser capture' : 'Browser capture'}</button><button className="text-link" aria-expanded={showEvaluation} disabled={!connected} onClick={() => setShowEvaluation((value) => !value)}>{showEvaluation ? 'Close evaluation lab' : 'Evaluation tools'}</button><button className="text-link" aria-expanded={showVocabulary} disabled={!connected} onClick={() => void toggleVocabulary()}>{showVocabulary ? 'Close vocabulary' : 'Vocabulary'}</button><button className="text-link" aria-expanded={showAi} onClick={() => setShowAi((value) => !value)}>{showAi ? 'Close AI settings' : 'AI settings'}</button></div></div>
+      {showAi && ai && <AiSettingsPanel status={ai} onChange={setAi} />}
+      {showVocabulary && <VocabularyPanel vocabulary={vocabulary} onChange={updateVocabulary} />}
+      {showCapture && <UrlCapturePanel onCaptured={(id) => void captured(id)} />}
+      {showEvaluation && <EvaluationPanel ai={ai} vocabulary={vocabulary} />}
+
       {error && <div className="error-message error-banner" role="alert"><span>{error}</span><button className="inline-link" onClick={() => void reconnect()}>Retry</button></div>}
 
       <section className="library-section" aria-labelledby="library-heading" aria-busy={loading}>
         <div className="library-toolbar"><div className="library-title"><h2 id="library-heading">{query ? 'Found in your index' : 'The collection'}</h2><span className="count">{total}</span></div><label className="search-field"><Icon name="search" size={17} /><span className="sr-only">Search references by title or note</span><input ref={searchInput} value={query} onChange={(event) => setQuery(event.target.value)} maxLength={200} placeholder="Search titles and notes…" />{query && <button className="icon-button small" aria-label="Clear search" onClick={() => setQuery('')}><Icon name="close" size={15} /></button>}</label></div>
         <div className="library-meta"><span>{query ? 'Text search · all words · prefix matching' : 'A growing archive of things that make you look twice.'}</span><span>{query ? 'RELEVANCE / NEWEST' : 'NEWEST FIRST'}</span></div>
+        <div className="facet-filters"><label><span className="sr-only">Filter facet</span><select value={filterFacet} onChange={(event) => { setFilterFacet(event.target.value as Facet); setFilterLabel(''); }}>{FACETS.map((facet) => <option key={facet}>{facet}</option>)}</select></label><label><span className="sr-only">Filter label</span><select value={filterLabel} onChange={(event) => setFilterLabel(event.target.value)}><option value="">All labels</option>{[...new Set([...vocabulary.terms[filterFacet], ...vocabulary.retiredTerms[filterFacet]])].map((value) => <option key={value} value={value}>{value}{vocabulary.terms[filterFacet].includes(value) ? '' : ' (retired)'}</option>)}</select></label>{filterLabel && <button className="inline-link" onClick={() => setFilterLabel('')}>Clear label filter</button>}</div>
         {loading && !items.length ? <div className="empty-state"><span className="loading-ring" /><p>Opening your index…</p></div> : !items.length ? <div className="empty-state"><div className="empty-illustration"><div className="paper paper-back" /><div className="paper paper-front"><span /><span /><span /><i /></div><span className="empty-spark">✳</span></div><p className="eyebrow">{query ? 'NOT HERE. YET.' : 'EVERY COLLECTION STARTS WITH ONE.'}</p><h3>{query ? 'Nothing matches this search.' : 'What caught your eye today?'}</h3><p>{query ? 'Try a different word, or search something from your notes.' : 'Save your first reference above. Its colors will come with it.'}</p>{query ? <button className="secondary-button" onClick={() => setQuery('')}>Clear search</button> : <button className="text-link" onClick={() => fileInput.current?.click()} disabled={!connected || uploading}>Add your first reference <Icon name="arrow" size={17} /></button>}</div> : <>
-          <div className={`gallery ${loading ? 'refreshing' : ''}`}>{items.map((item) => <button key={item.id} className="reference-card" onClick={() => setSelected(item)} aria-label={`Open ${item.title}`}><div className="reference-image"><img src={item.previewUrl} alt="" loading="lazy" style={{ aspectRatio: `${item.width} / ${item.height}` }} /><span className="image-open"><Icon name="arrow" size={18} /></span></div><div className="reference-body"><div className="reference-topline"><h3>{item.title}</h3><span className="reference-type">IMG</span></div>{item.note && <p className="reference-note">{item.note}</p>}<div className="card-footer"><span className="palette-strip" aria-label="Extracted colors">{item.palette.map((color) => <span key={color.hex} style={{ backgroundColor: color.hex }} />)}</span><span className="queued-label">AI queued</span></div></div></button>)}</div>
+          <div className={`gallery ${loading ? 'refreshing' : ''}`}>{items.map((item) => <button key={item.id} className="reference-card" onClick={() => setSelected(item)} aria-label={`Open ${item.title}`}><div className="reference-image"><img src={item.previewUrl} alt="" loading="lazy" style={{ aspectRatio: `${item.width} / ${item.height}` }} /><span className="image-open"><Icon name="arrow" size={18} /></span></div><div className="reference-body"><div className="reference-topline"><h3>{item.title}</h3><span className="reference-type">{item.type === 'url' ? 'URL' : 'IMG'}</span></div>{item.note && <p className="reference-note">{item.note}</p>}<div className="card-footer"><span className="palette-strip" aria-label="Extracted colors">{item.palette.map((color) => <span key={color.hex} style={{ backgroundColor: color.hex }} />)}</span><span className="queued-label">{item.status.replaceAll('_', ' ')}</span></div></div></button>)}</div>
           {items.length < total && <div className="load-more"><button className="secondary-button" disabled={loadingMore || loading} onClick={() => void loadMore()}>{loadingMore ? 'Loading…' : `Load more (${total - items.length})`}</button></div>}
         </>}
       </section>
       <footer className="page-footer"><span>Less searching. More making.</span><span>Saved here. Not out there. <span className="footer-dot">●</span></span></footer>
     </main>
     <div className={`toast ${notice ? 'visible' : ''}`} role="status" aria-live="polite">{notice && <><Icon name="check" size={17} />{notice}</>}</div>
-    {selected && <ItemDetail key={selected.id} item={selected} onClose={() => setSelected(null)} onUpdate={updateItem} announce={setNotice} />}
+    {selected && <ItemDetail key={selected.id} item={selected} vocabulary={vocabulary} onClose={() => setSelected(null)} onUpdate={updateItem} announce={setNotice} />}
   </div>;
 }
 

@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { openLibrary } from '../packages/database/src/index.js';
 import type { Library, NewImage } from '../packages/database/src/index.js';
 import { temporaryLibrary } from './helpers.js';
+import { migrations } from '../packages/database/src/migrations.js';
 
 let directory: string;
 let library: Library;
@@ -27,6 +28,26 @@ function record(title = 'Editorial landing', note = 'Lovely type pairing'): NewI
 }
 
 describe('SQLite library', () => {
+  it('upgrades a populated version-1 library without losing its note, palette, asset paths, or queued job', () => {
+    const path = join(directory, 'version-one.sqlite');
+    const old = new Database(path);
+    old.exec(migrations[0]!);
+    old.pragma('user_version=1');
+    old.prepare('INSERT INTO items VALUES(?,?,?,?,?,?,?,?,?)').run('old-item', 'image', 'Old reference', 'Keep my old note', 'old-hash', 'queued', '2026-10-01T00:00:00.000Z', 100, 80);
+    old.prepare('INSERT INTO assets VALUES(?,?,?,?,?,?,?)').run('asset', 'old-item', 'original', 'images/old/original.png', 'image/png', 100, 80);
+    old.prepare('INSERT INTO palette_colors VALUES(?,?,?,?,?,?,?,?,?,?)').run('color', 'old-item', '#000000', 0, 0, 0, null, 1, 'pixels', 0);
+    old.prepare('INSERT INTO jobs VALUES(?,?,?,?,?,?)').run('old-job', 'old-item', 'analyze', 'queued', 0, '2026-10-01T00:00:00.000Z');
+    old.close();
+    const upgraded = openLibrary(path);
+    try {
+      expect(upgraded.getItem('old-item')?.note).toBe('Keep my old note');
+      expect(upgraded.getItem('old-item')?.palette[0]?.hex).toBe('#000000');
+      expect(upgraded.getAsset('old-item', 'original')?.path).toBe('images/old/original.png');
+      expect(upgraded.queueCount()).toBe(1);
+      expect(upgraded.search({ q: 'old note' }).total).toBe(1);
+      expect(upgraded.intelligence.settings()).toMatchObject({ allowImageSharing: false, analyzeModel: 'claude-haiku-5-5', promptModel: 'claude-haiku-5-5' });
+    } finally { upgraded.close(); }
+  });
   it('persists an item, its palette, its assets, and a queued job across restarts', () => {
     const saved = library.createImage(record());
     expect(saved.item.status).toBe('queued');

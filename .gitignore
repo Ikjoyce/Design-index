@@ -22,6 +22,10 @@ library/
 *.sqlite-wal
 *.sqlite-shm
 
+# Drop-folder images are private local intake, not source assets.
+/inbox/*
+!/inbox/README.md
+
 # Editor and operating-system files
 .DS_Store
 Thumbs.db
